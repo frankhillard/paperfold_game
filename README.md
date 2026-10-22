@@ -15,3 +15,11 @@ The UI consists of the display of a grid representing the paper. this grid allow
 once the grid size is 1 by 1, we consider the attempt of the user finished and we can compare to resulting string to the expected one. If strings are equal the level is considered as completed, otherwise it is considered failed. If the level is failed display a button "retry" to reload the level.
 
 Once a level is completed display a button "retry" to reload the initial paper and a button "next" to start the next level.
+
+## Run
+
+```
+python3 -m http.server 8080
+```
+
+Then open http://127.0.0.1:8080/.
