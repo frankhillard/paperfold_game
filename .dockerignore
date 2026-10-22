@@ -1,0 +1,4 @@
+.git
+.bsp
+**/target
+web/js
