@@ -16,10 +16,28 @@ once the grid size is 1 by 1, we consider the attempt of the user finished and w
 
 Once a level is completed display a button "retry" to reload the initial paper and a button "next" to start the next level.
 
+## Build
+
+From the repository root, with a JDK and sbt installed:
+
+```
+sbt game/fastLinkJS
+```
+
+This writes `web/js/main.js`. Run it again after changing the Scala sources.
+
 ## Run
+
+From the repository root:
 
 ```
 python3 -m http.server 8080
 ```
 
 Then open http://127.0.0.1:8080/.
+
+Stop it with Ctrl+C in that terminal, or run:
+
+```
+pkill -f "python3 -m http.server 8080"
+```
