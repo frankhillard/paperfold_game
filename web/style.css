@@ -399,6 +399,18 @@ h2 {
   text-transform: none;
 }
 
+.target-stamp.is-compact {
+  width: 100%;
+  justify-self: stretch;
+  container-type: inline-size;
+}
+
+.target-stamp.is-compact strong {
+  font-size: 2.65cqi;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .play-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 230px;

@@ -154,7 +154,7 @@ object View:
       el("p", "level-chip", text(s"Level ${state.level.level}")),
       el(
         "div",
-        "target-stamp",
+        "target-stamp" + (if state.level.height == 8 && state.level.width == 7 then " is-compact" else ""),
         el("span", "", text("Target")),
         el("strong", "", text(state.level.target))
       ),
