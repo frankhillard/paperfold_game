@@ -9,32 +9,39 @@ object View:
       start: () => Unit,
       showHowTo: () => Unit,
       backToMenu: () => Unit,
-      chooseLevel: Int => Unit,
+      selectSize: String => Unit,
+      chooseLevel: Level.Entry => Unit,
       selectCrease: Crease => Unit,
       fold: Instruction => Unit,
       retry: () => Unit,
       nextLevel: () => Unit
   )
 
-  def render(model: Model, levels: Seq[Level.Entry], actions: Actions): dom.Element =
+  def render(
+      model: Model,
+      groups: Seq[Level.Group],
+      activeSize: Option[String],
+      catalogError: Option[String],
+      actions: Actions
+  ): dom.Element =
     model match
-      case Model.Menu               => menu(levels, actions)
+      case Model.Menu               => menu(groups, activeSize, catalogError, actions)
       case Model.HowTo              => howTo(actions)
-      case Model.Loading(n)         => loading(n)
+      case Model.Loading(label)     => loading(label)
       case Model.LoadError(message) => loadError(message, actions)
-      case play: Model.Play         => playView(play, levels, actions)
+      case play: Model.Play         => playView(play, groups, activeSize, catalogError, actions)
 
-  private def menu(levels: Seq[Level.Entry], actions: Actions): dom.Element =
+  private def menu(
+      groups: Seq[Level.Group],
+      activeSize: Option[String],
+      catalogError: Option[String],
+      actions: Actions
+  ): dom.Element =
     val card = el(
       "section",
       "card menu-card",
-      el("p", "eyebrow", text("a folding puzzle")),
-      el("h1", "", text("Paperfold")),
-      el(
-        "p",
-        "lede",
-        text("Fold a lettered sheet, one crease at a time, until a single stack remains.")
-      ),
+      gameTitle(),
+      el("p", "lede", text("A folding puzzle")),
       el(
         "div",
         "actions",
@@ -42,14 +49,23 @@ object View:
         button("How to play", "btn secondary", "howto", actions.showHowTo)
       )
     )
-    card.appendChild(levelPicker(levels, None, actions))
-    stage(card)
+    frames(card, levelPicker(groups, activeSize, None, catalogError, actions))
+
+  private def sampleButton(label: String, kind: String): dom.Element =
+    el("span", s"btn $kind note-sample", text(label))
+
+  private def gameTitle(heading: Boolean = true): dom.Element =
+    val image = dom.document.createElement("img").asInstanceOf[dom.html.Image]
+    image.src = "paperfold_title_final.png"
+    image.alt = "Paperfold"
+    el(if heading then "h1" else "p", "game-title", image)
 
   private def howTo(actions: Actions): dom.Element =
     stage(
       el(
         "section",
         "card how-card",
+        gameTitle(heading = false),
         el("p", "eyebrow", text("how to play")),
         el("h1", "", text("Fold on the creases")),
         el(
@@ -61,20 +77,32 @@ object View:
           step("4", "Match one cell", "Keep folding until a single cell remains. If its stack matches the target, the level is complete.")
         ),
         el(
-          "p",
-          "note",
-          text("Retry lays the sheet flat again. After a match, Next opens the following level.")
+          "div",
+          "notes",
+          el(
+            "p",
+            "note",
+            sampleButton("Retry", "secondary"),
+            text("lays the sheet flat again.")
+          ),
+          el(
+            "p",
+            "note",
+            sampleButton("Next", "primary"),
+            text("opens the following level after completing a level.")
+          )
         ),
         button("Back", "btn secondary", "back", actions.backToMenu)
       )
     )
 
-  private def loading(n: Int): dom.Element =
+  private def loading(label: String): dom.Element =
     stage(
       el(
         "section",
         "card menu-card",
-        el("p", "eyebrow", text(s"level $n")),
+        gameTitle(heading = false),
+        el("p", "eyebrow", text(s"level $label")),
         el("h1", "", text("Laying out the sheet")),
         el("p", "lede", text("Fetching the level."))
       )
@@ -85,6 +113,7 @@ object View:
       el(
         "section",
         "card menu-card",
+        gameTitle(heading = false),
         el("p", "eyebrow", text("missing sheet")),
         el("h1", "", text("That level did not load")),
         el("p", "lede", text(message)),
@@ -92,7 +121,13 @@ object View:
       )
     )
 
-  private def playView(state: Model.Play, levels: Seq[Level.Entry], actions: Actions): dom.Element =
+  private def playView(
+      state: Model.Play,
+      groups: Seq[Level.Group],
+      activeSize: Option[String],
+      catalogError: Option[String],
+      actions: Actions
+  ): dom.Element =
     val rows = Paper.height(state.paper)
     val cols = Paper.width(state.paper)
     val wrap = el("div", "sheet-wrap")
@@ -101,34 +136,29 @@ object View:
     wrap.appendChild(sheet(state, rows, cols, actions))
 
     val layout = el("div", "play-layout", wrap, moves(state))
-    val card = el("section", "card play-card", header(state, rows, cols, actions), layout)
+    val title = el("section", "card title-card", gameTitle())
+    val card = el("section", "card play-card", header(state, actions), layout)
     banner(state, actions).foreach(card.appendChild)
-    card.appendChild(levelPicker(levels, Some(state.levelNumber), actions))
-    stage(card)
+    frames(title, card, levelPicker(groups, activeSize, Some(state.path), catalogError, actions))
 
-  private def header(state: Model.Play, rows: Int, cols: Int, actions: Actions): dom.Element =
+  private def header(state: Model.Play, actions: Actions): dom.Element =
     el(
       "header",
       "topbar",
       el(
-        "div",
-        "brand-block",
-        el("p", "brand", text("Paperfold")),
-        el("p", "size", text(s"$rows × $cols"))
+        "p",
+        "size",
+        el("span", "size-label", text("Paper size")),
+        text(s"${state.level.height} × ${state.level.width}")
       ),
+      el("p", "level-chip", text(s"Level ${state.level.level}")),
       el(
         "div",
         "target-stamp",
         el("span", "", text("Target")),
         el("strong", "", text(state.level.target))
       ),
-      el(
-        "div",
-        "level-block",
-        el("p", "level-chip", text(s"Level ${state.level.level}")),
-        el("p", "fold-count", text(foldCount(state.moves.length))),
-        button("Menu", "btn tiny", "menu", actions.backToMenu)
-      )
+      button("Menu", "btn tiny", "menu", actions.backToMenu)
     )
 
   private def prompt(state: Model.Play): Option[dom.Element] =
@@ -391,9 +421,6 @@ object View:
       el("div", "step-body", el("h2", "", text(title)), el("p", "", text(body)))
     )
 
-  private def foldCount(n: Int): String =
-    if n == 1 then "1 fold" else s"$n folds"
-
   private def moveWord(instruction: Instruction): String =
     instruction.part match
       case 'L' => "left over right"
@@ -402,33 +429,58 @@ object View:
       case 'B' => "bottom over top"
       case _   => ""
 
-  private def levelPicker(levels: Seq[Level.Entry], current: Option[Int], actions: Actions): dom.Element =
-    val picker = el("section", "level-picker", el("h2", "", text("Levels")))
-    if levels.isEmpty then picker.appendChild(el("p", "level-empty", text("Looking for sheets.")))
+  private def levelPicker(
+      groups: Seq[Level.Group],
+      activeSize: Option[String],
+      currentPath: Option[String],
+      catalogError: Option[String],
+      actions: Actions
+  ): dom.Element =
+    val picker = el("section", "card level-card", el("h2", "", text("Levels")))
+    if groups.isEmpty then
+      val message = catalogError.getOrElse("Looking for sheets.")
+      picker.appendChild(el("p", "level-empty", text(message)))
     else
-      val list = el("div", "level-choices")
-      levels.foreach { entry =>
-        val selected = current.contains(entry.number)
-        val cls = "level-choice" + (if selected then " is-current" else "")
-        val choice = el(
-          "button",
-          cls,
-          el("span", "level-choice-n", text(s"Level ${entry.level.level}")),
-          el("span", "level-choice-size", text(s"${entry.level.height} × ${entry.level.width}")),
-          el("span", "level-choice-target", text(entry.level.target))
-        ).asInstanceOf[dom.html.Button]
-        choice.setAttribute("type", "button")
-        choice.setAttribute("data-level", entry.number.toString)
-        if selected then choice.setAttribute("aria-current", "true")
-        choice.addEventListener("click", (_: dom.Event) => actions.chooseLevel(entry.number))
-        list.appendChild(choice)
+      val shown = activeSize.flatMap(size => groups.find(_.size == size)).getOrElse(groups.head)
+      val tabs = el("div", "level-tabs")
+      tabs.setAttribute("role", "tablist")
+      groups.foreach { group =>
+        val selected = group.size == shown.size
+        val tab = el("button", "level-tab" + (if selected then " is-active" else ""), text(Level.sizeLabel(group.size)))
+          .asInstanceOf[dom.html.Button]
+        tab.setAttribute("type", "button")
+        tab.setAttribute("role", "tab")
+        tab.setAttribute("data-size", group.size)
+        tab.setAttribute("aria-selected", if selected then "true" else "false")
+        tab.addEventListener("click", (_: dom.Event) => actions.selectSize(group.size))
+        tabs.appendChild(tab)
       }
-      picker.appendChild(list)
+      val dots = el("div", "level-dots")
+      dots.setAttribute("role", "tabpanel")
+      shown.entries.foreach { entry =>
+        val selected = currentPath.contains(entry.path)
+        val dot = el(
+          "button",
+          "level-dot" + (if selected then " is-current" else ""),
+          text(entry.level.level)
+        ).asInstanceOf[dom.html.Button]
+        dot.setAttribute("type", "button")
+        dot.setAttribute("data-level", entry.level.level)
+        dot.setAttribute("data-path", entry.path)
+        if selected then dot.setAttribute("aria-current", "true")
+        dot.addEventListener("click", (_: dom.Event) => actions.chooseLevel(entry))
+        dots.appendChild(dot)
+      }
+      picker.appendChild(tabs)
+      picker.appendChild(dots)
     picker
 
   private def tracks(count: Int, cell: String): String =
     if count <= 1 then cell
     else List.fill(count)(cell).mkString(" 1.35rem ")
+
+  private def frames(kids: dom.Element*): dom.Element =
+    stage(el("div", "frames", kids*))
 
   private def stage(kids: dom.Node*): dom.Element =
     el("main", "stage", kids*)

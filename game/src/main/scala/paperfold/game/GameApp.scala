@@ -11,16 +11,22 @@ import paperfold.{Folder, Instruction, Paper}
 object GameApp:
   private var model: Model = Model.Menu
   private var token: Int = 0
-  private var catalog: Vector[Level.Entry] = Vector.empty
+  private var catalog: Vector[Level.Group] = Vector.empty
+  private var activeSize: Option[String] = None
+  private var catalogError: Option[String] = None
 
   def main(args: Array[String]): Unit =
     if dom.document.getElementById("app") != null then
       render()
-      discoverLevels(1, Vector.empty)
+      discoverLevels()
 
   private def actions: View.Actions =
     View.Actions(
-      start = () => loadLevel(1),
+      start = () =>
+        ordered.headOption match
+          case Some(entry) => loadEntry(entry)
+          case None        => update(Model.LoadError(catalogError.getOrElse("No levels found.")))
+      ,
       showHowTo = () =>
         token += 1
         update(Model.HowTo)
@@ -29,7 +35,8 @@ object GameApp:
         token += 1
         update(Model.Menu)
       ,
-      chooseLevel = loadLevel,
+      selectSize = selectSize,
+      chooseLevel = loadEntry,
       selectCrease = selectCrease,
       fold = fold,
       retry = retry,
@@ -43,18 +50,28 @@ object GameApp:
   private def render(): Unit =
     val root = dom.document.getElementById("app")
     root.innerHTML = ""
-    root.appendChild(View.render(model, catalog, actions))
+    root.appendChild(View.render(model, catalog, activeSize, catalogError, actions))
 
-  /** Walk levels/levelN.json until a number is missing, and keep the menu list in step. */
-  private def discoverLevels(n: Int, found: Vector[Level.Entry]): Unit =
-    Level.load(n).onComplete {
-      case Success(Some(level)) =>
-        val next = found :+ Level.Entry(n, level)
-        catalog = next
+  /** Read every size folder under levels/ and keep the tabs in step. */
+  private def discoverLevels(): Unit =
+    Level.catalog().onComplete {
+      case Success(groups) =>
+        catalog = groups
+        catalogError = None
+        if activeSize.forall(size => !groups.exists(_.size == size)) then
+          activeSize = groups.headOption.map(_.size)
         refreshQuietly()
-        discoverLevels(n + 1, next)
-      case _ => ()
+      case Failure(err) =>
+        catalogError = Some(messageOf(err))
+        refreshQuietly()
     }
+
+  private def ordered: Vector[Level.Entry] =
+    catalog.flatMap(_.entries)
+
+  private def selectSize(size: String): Unit =
+    activeSize = Some(size)
+    render()
 
   private def refreshQuietly(): Unit =
     val playing = model match
@@ -62,33 +79,30 @@ object GameApp:
       case _                => false
     if !playing then render()
 
-  private def loadLevel(n: Int): Unit =
-    update(Model.Loading(n))
-    takeLevel(n)(
-      onMissing = () => update(Model.LoadError(s"No level file at levels/level$n.json")),
-      onReady = level => openLevel(n, level)
+  private def loadEntry(entry: Level.Entry): Unit =
+    activeSize = Some(entry.size)
+    update(Model.Loading(entry.level.level))
+    takeLevel(entry)(
+      onMissing = () => update(Model.LoadError(s"No level file at ${entry.path}")),
+      onReady = level => openLevel(entry, level)
     )
 
   private def nextLevel(): Unit =
     model match
       case play: Model.Play if play.outcome == Outcome.Cleared && !play.pendingNext =>
-        update(play.copy(pendingNext = true, note = None))
-        val n = play.levelNumber + 1
-        takeLevel(n)(
-          onMissing = () =>
-            model match
-              case current: Model.Play =>
-                update(current.copy(pendingNext = false, note = Some("That was the last level.")))
-              case _ => ()
-          ,
-          onReady = level => openLevel(n, level)
-        )
+        val following = ordered.dropWhile(_.path != play.path).drop(1).headOption
+        following match
+          case Some(entry) =>
+            update(play.copy(pendingNext = true, note = None))
+            loadEntry(entry)
+          case None =>
+            update(play.copy(pendingNext = false, note = Some("That was the last level.")))
       case _ => ()
 
-  private def takeLevel(n: Int)(onMissing: () => Unit, onReady: Level.Def => Unit): Unit =
+  private def takeLevel(entry: Level.Entry)(onMissing: () => Unit, onReady: Level.Def => Unit): Unit =
     token += 1
     val current = token
-    Level.load(n).onComplete {
+    Level.load(entry.path).onComplete {
       case Success(Some(level)) if current == token => onReady(level)
       case Success(None) if current == token        => onMissing()
       case Failure(err) if current == token =>
@@ -100,12 +114,15 @@ object GameApp:
       case _ => ()
     }
 
-  private def openLevel(n: Int, level: Level.Def): Unit =
+  private def openLevel(entry: Level.Entry, level: Level.Def): Unit =
+    activeSize = Some(entry.size)
+    val number = level.level.toIntOption.getOrElse(0)
     try
       val paper = Paper.create(level.height, level.width, level.alphabet)
       update(
         Model.Play(
-          levelNumber = n,
+          levelNumber = number,
+          path = entry.path,
           level = level,
           paper = paper,
           moves = Nil,

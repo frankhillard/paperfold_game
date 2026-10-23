@@ -67,9 +67,37 @@ button {
   width: min(640px, 100%);
 }
 
+.frames {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.frames:has(.play-card) {
+  width: min(980px, 100%);
+}
+
+.frames .card {
+  width: 100%;
+}
+
+.title-card {
+  padding-top: 1.15rem;
+  padding-bottom: 1.15rem;
+  text-align: center;
+}
+
+.title-card .game-title {
+  margin: 0;
+}
+
+.title-card .game-title img {
+  margin-inline: auto;
+}
+
 h1,
 h2,
-.brand,
 .target-stamp strong,
 .stack {
   font-family: "Fraunces", Palatino, Georgia, serif;
@@ -110,6 +138,59 @@ h2 {
   margin: 0.2rem 0 1.1rem;
 }
 
+.notes {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.35rem 0 1.15rem;
+}
+
+.notes .note {
+  margin: 0;
+}
+
+.btn.note-sample {
+  display: inline-block;
+  margin-right: 0.45rem;
+  padding: calc(0.8rem * 0.75) calc(1.35rem * 0.75);
+  font-size: 0.75rem;
+  line-height: normal;
+  vertical-align: middle;
+  cursor: default;
+  pointer-events: none;
+}
+
+.game-title {
+  margin: 0 0 1.05rem;
+  line-height: 0;
+}
+
+.game-title img {
+  display: block;
+  width: min(16rem, 100%);
+  height: auto;
+}
+
+.menu-card .game-title {
+  margin-bottom: 0;
+}
+
+.menu-card:has(> .actions) {
+  text-align: center;
+}
+
+.menu-card:has(> .actions) .game-title img {
+  margin-inline: auto;
+}
+
+.menu-card .game-title + .lede {
+  margin-top: 0.85rem;
+}
+
+.menu-card:has(> .actions) .actions {
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -117,12 +198,8 @@ h2 {
   margin-top: 1.25rem;
 }
 
-.level-picker {
-  margin-top: 1.4rem;
-}
-
-.level-picker h2 {
-  margin-bottom: 0.15rem;
+.level-card h2 {
+  margin-bottom: 0.55rem;
 }
 
 .level-empty {
@@ -130,49 +207,53 @@ h2 {
   color: #5c5146;
 }
 
-.level-choices {
-  list-style: none;
-  margin: 0.55rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.4rem;
+.level-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
-.level-choice {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  gap: 0.7rem;
-  align-items: baseline;
-  width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: 0;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.55);
-  color: inherit;
-  text-align: left;
+.level-tab {
+  border: 2px solid #3d342b;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #5c5146;
+  font-weight: 700;
+  padding: 0.3rem 0.7rem;
   cursor: pointer;
 }
 
-.level-choice:hover {
-  background: rgba(31, 107, 69, 0.1);
-}
-
-.level-choice.is-current {
-  box-shadow: inset 0 0 0 1.5px #1f6b45;
-}
-
-.level-choice-n {
-  font-weight: 700;
-}
-
-.level-choice-size {
-  color: #5c5146;
-}
-
-.level-choice-target {
-  font-family: "Fraunces", Palatino, Georgia, serif;
+.level-tab.is-active {
   color: #1f6b45;
-  overflow-wrap: anywhere;
+  border-color: #1f6b45;
+}
+
+.level-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.level-dot {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 2px solid #3d342b;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  color: #2a241c;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.level-dot:hover {
+  background: rgba(31, 107, 69, 0.16);
+}
+
+.level-dot.is-current {
+  background: #1f6b45;
+  color: #f7f1e5;
 }
 
 .btn {
@@ -216,6 +297,8 @@ h2 {
 }
 
 .btn:focus-visible,
+.level-tab:focus-visible,
+.level-dot:focus-visible,
 .cell:focus-visible,
 .crease:focus-visible {
   outline: 3px solid #1f6b45;
@@ -253,38 +336,48 @@ h2 {
 }
 
 .topbar {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  row-gap: 0.85rem;
   margin-bottom: 1.1rem;
 }
 
-.brand {
-  margin: 0;
-  font-size: 1.45rem;
-  letter-spacing: -0.03em;
+.size {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+}
+
+.level-chip {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+}
+
+.topbar .btn {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
 }
 
 .size,
-.fold-count,
 .level-chip {
   margin: 0;
-  color: #5c5146;
+  color: #2a241c;
+  font-family: "Fraunces", Palatino, Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 560;
 }
 
-.level-block {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
-
-.level-chip {
-  font-weight: 700;
+.size-label {
+  margin-right: 0.35rem;
 }
 
 .target-stamp {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
   display: grid;
   justify-items: center;
   gap: 0.1rem;

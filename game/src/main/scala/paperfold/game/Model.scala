@@ -14,10 +14,11 @@ enum Outcome:
 enum Model:
   case Menu
   case HowTo
-  case Loading(levelNumber: Int)
+  case Loading(label: String)
   case LoadError(message: String)
   case Play(
       levelNumber: Int,
+      path: String,
       level: Level.Def,
       paper: Array[Array[String]],
       moves: List[Instruction],

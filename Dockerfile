@@ -24,12 +24,16 @@ RUN printf '%s\n' \
   '  listen 8080;' \
   '  server_name _;' \
   '  root /usr/share/nginx/html;' \
+  '  location /levels/ {' \
+  '    autoindex on;' \
+  '  }' \
   '  location / {' \
   '    try_files $uri $uri/ =404;' \
   '  }' \
   '}' > /etc/nginx/conf.d/default.conf
 
 COPY index.html /usr/share/nginx/html/index.html
+COPY paperfold_title_final.png /usr/share/nginx/html/paperfold_title_final.png
 COPY web/style.css /usr/share/nginx/html/web/style.css
 COPY levels /usr/share/nginx/html/levels
 COPY --from=build /src/web/js /usr/share/nginx/html/web/js
