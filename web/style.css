@@ -585,6 +585,12 @@ h2 {
   background: rgba(255, 255, 255, 0.35);
 }
 
+.moves .solution {
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.8rem;
+}
+
 .move-list {
   list-style: none;
   margin: 0.7rem 0 0;
@@ -651,8 +657,12 @@ h2 {
   letter-spacing: 0.04em;
 }
 
-.last-level {
+.last-level,
+.solution-time {
   margin-top: 0.35rem;
+}
+
+.last-level {
   font-weight: 700;
 }
 

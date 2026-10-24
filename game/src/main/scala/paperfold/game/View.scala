@@ -14,7 +14,8 @@ object View:
       selectCrease: Crease => Unit,
       fold: Instruction => Unit,
       retry: () => Unit,
-      nextLevel: () => Unit
+      nextLevel: () => Unit,
+      solve: () => Unit
   )
 
   def render(
@@ -135,7 +136,7 @@ object View:
     legend(state).foreach(wrap.appendChild)
     wrap.appendChild(sheet(state, rows, cols, actions))
 
-    val layout = el("div", "play-layout", wrap, moves(state))
+    val layout = el("div", "play-layout", wrap, moves(state, actions))
     val title = el("section", "card title-card", gameTitle())
     val card = el("section", "card play-card", header(state, actions), layout)
     banner(state, actions).foreach(card.appendChild)
@@ -338,7 +339,7 @@ object View:
       if stack.length > 1 then node.appendChild(el("span", "buried", text(stack.tail)))
     node
 
-  private def moves(state: Model.Play): dom.Element =
+  private def moves(state: Model.Play, actions: Actions): dom.Element =
     val list = el("ol", "move-list")
     if state.moves.isEmpty then list.appendChild(el("li", "empty", text("No folds yet")))
     else
@@ -353,7 +354,15 @@ object View:
           )
         )
       }
-    el("aside", "moves", el("h2", "", text("Folds")), list)
+    val busy = state.solving || state.animating.nonEmpty || state.pendingNext
+    val label = if state.solving && state.animating.isEmpty && state.moves.isEmpty then "Solving…" else "Solution"
+    el(
+      "aside",
+      "moves",
+      el("h2", "", text("Folds")),
+      list,
+      button(label, "btn secondary solution", "solution", actions.solve, busy)
+    )
 
   private def banner(state: Model.Play, actions: Actions): Option[dom.Element] =
     val got =
@@ -390,6 +399,7 @@ object View:
               el("strong", "", text(state.level.target)),
               text(".")
             ),
+            solutionTime(state),
             note,
             el(
               "div",
@@ -407,6 +417,13 @@ object View:
         )
       case Outcome.Playing =>
         state.note.map(message => notice("banner fail", el("p", "banner-copy", text(message))))
+
+  private def solutionTime(state: Model.Play): dom.Node =
+    state.solutionSeconds match
+      case Some(seconds) =>
+        el("p", "banner-copy solution-time", text(f"Solution found by UnfolderIA in $seconds%.3f seconds"))
+      case None =>
+        text("")
 
   private def notice(cls: String, kids: dom.Node*): dom.Element =
     val node = el("div", cls, kids*)

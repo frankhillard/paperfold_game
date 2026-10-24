@@ -26,5 +26,7 @@ enum Model:
       outcome: Outcome,
       animating: Option[Instruction],
       pendingNext: Boolean,
-      note: Option[String]
-  )
+      note: Option[String],
+      solving: Boolean = false,
+      solutionSeconds: Option[Double] = None
+    )

@@ -6,7 +6,7 @@ import scala.util.{Failure, Success}
 
 import org.scalajs.dom
 
-import paperfold.{Folder, Instruction, Paper}
+import paperfold.{Folder, Instruction, Paper, UnfolderIA}
 
 object GameApp:
   private var model: Model = Model.Menu
@@ -14,6 +14,7 @@ object GameApp:
   private var catalog: Vector[Level.Group] = Vector.empty
   private var activeSize: Option[String] = None
   private var catalogError: Option[String] = None
+  private var solutionQueue: List[Instruction] = Nil
 
   def main(args: Array[String]): Unit =
     if dom.document.getElementById("app") != null then
@@ -33,6 +34,7 @@ object GameApp:
       ,
       backToMenu = () =>
         token += 1
+        cancelSolution()
         update(Model.Menu)
       ,
       selectSize = selectSize,
@@ -40,7 +42,8 @@ object GameApp:
       selectCrease = selectCrease,
       fold = fold,
       retry = retry,
-      nextLevel = nextLevel
+      nextLevel = nextLevel,
+      solve = solve
     )
 
   private def update(next: Model): Unit =
@@ -80,6 +83,7 @@ object GameApp:
     if !playing then render()
 
   private def loadEntry(entry: Level.Entry): Unit =
+    cancelSolution()
     activeSize = Some(entry.size)
     update(Model.Loading(entry.level.level))
     takeLevel(entry)(
@@ -139,6 +143,7 @@ object GameApp:
 
   private def selectCrease(crease: Crease): Unit =
     model match
+      case play: Model.Play if play.solving => ()
       case play: Model.Play if play.outcome == Outcome.Playing && play.animating.isEmpty =>
         val next = if play.crease.contains(crease) then None else Some(crease)
         update(play.copy(crease = next))
@@ -146,8 +151,8 @@ object GameApp:
 
   private def fold(instruction: Instruction): Unit =
     model match
-      case play: Model.Play => beginFold(play, instruction)
-      case _                => ()
+      case play: Model.Play if !play.solving => beginFold(play, instruction)
+      case _                                 => ()
 
   private def beginFold(play: Model.Play, instruction: Instruction): Unit =
     if play.animating.isEmpty && play.outcome == Outcome.Playing then
@@ -161,6 +166,7 @@ object GameApp:
             if Paper.height(folded) == 1 && Paper.width(folded) == 1 then
               if folded(0)(0) == play.level.target then Outcome.Cleared else Outcome.Failed
             else Outcome.Playing
+          val stillSolving = solutionQueue.nonEmpty
           update(
             play.copy(
               paper = folded,
@@ -169,15 +175,75 @@ object GameApp:
               outcome = outcome,
               animating = None,
               pendingNext = false,
-              note = None
+              note = None,
+              solving = stillSolving
             )
           )
+          if stillSolving then advanceSolution()
       }
+
+  private def solve(): Unit =
+    model match
+      case play: Model.Play if play.animating.isEmpty && !play.solving && !play.pendingNext =>
+        token += 1
+        val current = token
+        update(play.copy(note = None, solving = true, crease = None))
+        setTimeout(0) {
+          if current == token then
+            try
+              val started = dom.window.performance.now()
+              val instructions =
+                UnfolderIA.instructionsFor(play.level.height, play.level.width, play.level.target)
+              val seconds = (dom.window.performance.now() - started) / 1000.0
+              model match
+                case latest: Model.Play if latest.path == play.path =>
+                  val paper = Paper.create(play.level.height, play.level.width, play.level.alphabet)
+                  solutionQueue = instructions
+                  update(
+                    latest.copy(
+                      paper = paper,
+                      moves = Nil,
+                      crease = None,
+                      outcome = Outcome.Playing,
+                      animating = None,
+                      pendingNext = false,
+                      note = None,
+                      solving = instructions.nonEmpty,
+                      solutionSeconds = Some(seconds)
+                    )
+                  )
+                  advanceSolution()
+                case _ =>
+                  cancelSolution()
+            catch
+              case e: IllegalArgumentException =>
+                cancelSolution()
+                model match
+                  case latest: Model.Play => update(latest.copy(solving = false, note = Some(messageOf(e))))
+                  case _                  => ()
+        }
+      case _ => ()
+
+  private def advanceSolution(): Unit =
+    solutionQueue match
+      case Nil =>
+        model match
+          case play: Model.Play => update(play.copy(solving = false))
+          case _                => ()
+      case instruction :: rest =>
+        solutionQueue = rest
+        model match
+          case play: Model.Play => beginFold(play, instruction)
+          case _                => cancelSolution()
+
+  private def cancelSolution(): Unit =
+    solutionQueue = Nil
 
   private def retry(): Unit =
     model match
       case play: Model.Play =>
         token += 1
+        cancelSolution()
         try
           val paper = Paper.create(play.level.height, play.level.width, play.level.alphabet)
           update(
@@ -188,7 +254,9 @@ object GameApp:
               outcome = Outcome.Playing,
               animating = None,
               pendingNext = false,
-              note = None
+              note = None,
+              solving = false,
+              solutionSeconds = None
             )
           )
         catch

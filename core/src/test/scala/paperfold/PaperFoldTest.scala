@@ -155,5 +155,15 @@ class PaperFoldTest extends munit.FunSuite:
       List(List("VOxqut!#SRYZaXQT$zsvwry%UPWbidINGBkpolCFMJehgfKLEDmnjAHc"))
     )
 
+  test("UnfolderIA recovers a 2x2 folding of BACD"):
+    val instructions = UnfolderIA.instructionsFor(2, 2, "BACD")
+    val folded = Folder.applyAll(Paper.create(2, 2), instructions)
+    assertEquals(toLists(folded), List(List("BACD")))
+
+  test("UnfolderIA recovers a 3x3 folding of HIGADFEBC"):
+    val instructions = UnfolderIA.instructionsFor(3, 3, "HIGADFEBC")
+    val folded = Folder.applyAll(Paper.create(3, 3), instructions)
+    assertEquals(toLists(folded), List(List("HIGADFEBC")))
+
   private def toLists(paper: Array[Array[String]]): List[List[String]] =
     paper.map(_.toList).toList
